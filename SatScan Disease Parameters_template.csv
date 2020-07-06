@@ -1,0 +1,15 @@
+Disease,Notication Email List,Max_Size
+Campylobacteriosis,,30
+Cryptosporidiosis,,30
+Cyclosporiasis,,30
+Hepatitis A,,60
+Legionellosis,,90
+Mumps,,30
+Pertussis,,30
+Salmonellosis,,30
+STEC O157:H7,,60
+STEC Not Cultured,,60
+STEC Non-O157,,60
+Shigellosis,,30
+Group A Strep,,30
+Varicella,,30
