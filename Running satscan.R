@@ -49,24 +49,26 @@ Sys.setenv(RSTUDIO_PANDOC="C:/Program Files/RStudio/bin/pandoc")
 #          `Event Date` = mdy(str_remove(`Event Date`, ' 0:00')))
 
 #Importing Business Objects Report
-events <- read_csv("C:/Users/kbemis/Downloads/SatScan_Data.csv", col_types = "ccccccccciccccccddccdcccc") %>%
-  mutate(`Onset Date` = ymd(str_remove(`Onset Date`, '[[:space:]].*')),
-         `Event Date` = ymd(str_remove(`Event Date`, '[[:space:]].*')))
+events <- read_csv("C:/Users/rishi.kowalski/Data/satscan-data/SatScanData052223.csv", col_types = "ccccccccciccccccddccdcccc") %>%
+              mutate(
+                `Onset Date` = ymd(str_remove(`Onset Date`, '[[:space:]].*')),
+                `Event Date` = ymd(str_remove(`Event Date`, '[[:space:]].*')))
 
 
 #Replacing spaces in column names
 names(events) <- gsub(" |/","_",names(events))
 
 #Combining disease types for legionella and GAS and cleaning disease names
-events <- mutate(events, Disease = case_when(
-  grepl('Legionellosis', events$Disease) ~ 'Legionellosis',
-  grepl('Streptococcal', events$Disease) ~ 'Group A Strep',
-  grepl('^Shiga.*not cultured', events$Disease) ~ "STEC Not Cultured",
-  grepl('^Shiga.*non-O157', events$Disease) ~ "STEC Non-O157",
-  grepl('^Shiga.*O157:H7', events$Disease) ~ "STEC O157:H7",
-  grepl("Varicella", events$Disease) ~ "Varicella",
-  TRUE ~ Disease
-))
+events <- mutate(events, 
+            Disease = case_when(
+              grepl('Legionellosis', events$Disease) ~ 'Legionellosis',
+              grepl('Streptococcal', events$Disease) ~ 'Group A Strep',
+              grepl('^Shiga.*not cultured', events$Disease) ~ "STEC Not Cultured",
+              grepl('^Shiga.*non-O157', events$Disease) ~ "STEC Non-O157",
+              grepl('^Shiga.*O157:H7', events$Disease) ~ "STEC O157:H7",
+              grepl("Varicella", events$Disease) ~ "Varicella",
+              TRUE ~ Disease
+              ))
 
 #Keep only events with verified addresses
 eventsVer <- filter(events, `Address_Verified_(Home)` == "YES")
@@ -75,7 +77,7 @@ eventsVer <- filter(events, `Address_Verified_(Home)` == "YES")
 eventsVer$DOW <- wday(eventsVer$Event_Date)
 
 #Importing disease parameter file
-parameters <- read_csv('SatScan Disease Parameters.csv', col_types = "cci")
+parameters <- read_tsv('SatScan Disease Parameters.csv', col_types = "cci")
 
 
 ###################COMMENT OUT WHEN DONE TESTING#################################
@@ -118,18 +120,17 @@ run_satscan <- function(disease, serogroup) {
   
 #Creating cases file for SatScan
 casfile <- eventsFilter %>%
-    mutate(Count = 1) %>%
-    select(EventID = State_Case_Number,
-           Count,
-           Event_Date,
-           DOW)
+            mutate(Count = 1) %>%
+            select(EventID = State_Case_Number,
+                   Count,
+                   Event_Date,
+                   DOW)
   
 #Creating coordinates file for SatScan
 geofile <- eventsFilter %>%
-    select(EventID = State_Case_Number,
-           Latitude = `Latitude_(Home)`,
-           Longitude = `Longitude_(Home)`)
-  
+            select(EventID = State_Case_Number,
+                   Latitude = `Latitude_(Home)`,
+                   Longitude = `Longitude_(Home)`)
 
 #Reset the options for the parameter file
 invisible(ss.options(reset=TRUE))
@@ -137,7 +138,7 @@ invisible(ss.options(reset=TRUE))
 #Set options related to the input tab 
 ss.options(list(CaseFile = "SessionR.cas", 
                 PrecisionCaseTimes = 3,
-                StartDate = format(Sys.Date()-366, "%Y/%m/%d"),
+                StartDate = format(Sys.Date()-366, "%Y/%m/%d"), #366 initially
                 EndDate = format(Sys.Date()-1, "%Y/%m/%d"),
                 CoordinatesFile = "SessionR.geo",
                 CoordinatesType = 1
@@ -168,15 +169,17 @@ ss.options(list(ResultsFile = "S:/SatScan Project/ScanResult.txt",  #doesn't app
 ))
 
 #Set advanced options 
-ss.options(list(UseDistanceFromCenterOption = "n",
+ss.options(list(StudyPeriodCheckType=1, #relax geography bounds per cop
+                GeographicalCoordinatesCheckType = 1,
+                UseDistanceFromCenterOption = "n",
                 MaxSpatialSizeInDistanceFromCenter = 1,
                 NonCompactnessPenalty = 1,
                 MaxTemporalSize = as.integer(paramFilter$Max_Size),
                 MaxTemporalSizeInterpretation = 1,  
                 ProspectiveStartDate = format(Sys.Date()-366, "%Y/%m/%d"),  #Not sure if this parameter is correct?
                 CriteriaForReportingSecondaryClusters = 1,
-                LogRunToHistoryFile = "y"#,
-                #Version = "9.4.4"  #actually running version 9.6 but when correct and enabled, script fails? Works when not specified. 
+                LogRunToHistoryFile = "y",
+                Version = "9.6.1"  #actually running version 9.6 but when correct and enabled, script fails? Works when not specified. - need to specify last digit (rk 4/18/23)
 ))
 
 #Write files
@@ -190,25 +193,23 @@ ss.options(list(UseDistanceFromCenterOption = "n",
 
 #Write files
 td <- tempdir()
+print(list.files(td))
 write.ss.prm(td, "SessionR")
 write.cas(as.data.frame(casfile), td, "SessionR")
 write.geo(as.data.frame(geofile), td, "SessionR")
 
 #Run SatScan and store results
-
-session <- try(satscan(td, "SessionR", sslocation = "C:/Program Files/SaTScan", cleanup = FALSE, verbose = TRUE), silent = T)
+session <- try(satscan(td, "SessionR", sslocation = "C:/SaTScan", cleanup = FALSE, verbose = TRUE), silent = T)
 
 if (class(session) == "try-error"){
   sink(file = 'satscan_function_log.txt', append = T)
-  cat('No results returned for', disease_run_name, '\n')
+  print(paste0('No results returned for ', disease_run_name, ', run: ', Sys.time(), '\n'))
   sink()
   
-  write(paste0(disease_run_name, "_", Sys.Date(), " - ", session, "\n"), file = 'try_error_log.txt', append = T)
+  write(paste0(disease_run_name, "_", Sys.time(), " - ", session, "\n"), file = 'try_error_log.txt', append = T)
   
   return()
 }
-
-
 
 #=================PACKAGING SATSCAN RESULTS================#
 
@@ -217,7 +218,7 @@ if (max(session$col$RECURR_INT) < 100) {             ####REDUCE NUMBER IF TESTIN
   
   #Add result to log file
   sink(file = 'satscan_function_log.txt', append = T)
-  cat('No significant cluster for', disease_run_name, '\n')
+  print(paste0('No significant cluster for ', disease_run_name, ', run: ', Sys.time(), '\n'))
   sink()
   
   #Creating log of most likely cluster to add to history file       
@@ -357,13 +358,13 @@ if (max(session$col$RECURR_INT) < 100) {             ####REDUCE NUMBER IF TESTIN
                         params = list(data = report_data))
       
       #Email report to epidemiologist
-      send.mail(from = key_get("satscan_sender"),
+      send.mail(from = "noreply@cookcountyhhs.org",
                 to = unlist(strsplit(paramFilter$Email, ",")),                       
                 subject = paste("SECURELOCK: SatScan has detected a new cluster for", disease_run_name),
                 body = "Please review the attached line list and determine if the cluster should be investigated further.",   
-                smtp = list(host.name = key_get("email_host"), #port = 25,
-                            user.name = key_get("email"),
-                            passwd = key_get("email_pw"), tls = TRUE),
+                smtp = list(host.name = key_get("cchhs_host"), #port = **,
+                            user.name = key_get("rk_email"),
+                            passwd = key_get("office365"), tls = TRUE),
                 attach.files = paste0("Clusters/Cluster Report ID ", cluster_temp$ClusterID, ".html"),
                 authenticate = TRUE,
                 send = TRUE) 
@@ -419,7 +420,7 @@ if (max(session$col$RECURR_INT) < 100) {             ####REDUCE NUMBER IF TESTIN
         
         line_list_table <- line_list %>%
           select(-Lat, -Long) %>%
-          select_if(function(col) !(all(is.na(col)))) %>% #Will eliminate any columns that are empty for all cases, e.g. Serogroup
+          select_if(function(col) !(all(is.nas(col)))) %>% #Will eliminate any columns that are empty for all cases, e.g. Serogroup
           arrange(Event_Date)
         
         #Prepare map
@@ -464,13 +465,13 @@ if (max(session$col$RECURR_INT) < 100) {             ####REDUCE NUMBER IF TESTIN
                           params = list(data = report_data))
         
         #Email report to epidemiologist
-        send.mail(from = key_get("satscan_sender"),
+        send.mail(from = "noreply@cookcountyhhs.org",
                   to = unlist(strsplit(paramFilter$Email, ",")),                       
                   subject = paste("SECURELOCK: SatScan has detected new cases in an ongoing", disease_run_name, "cluster"),
                   body = paste0("New cases have been detected for cluster ", which_clust, ". Please review the updated line list and map attached."),   
-                  smtp = list(host.name = key_get("email_host"), #port = 25,
-                              user.name = key_get("email"),
-                              passwd = key_get("email_pw"), tls = TRUE),
+                  smtp = list(host.name = key_get("cchhs_host"), #port = **,
+                              user.name = key_get("rk_email"),
+                              passwd = key_get("office365"), tls = TRUE),
                   attach.files = paste0("Clusters/Cluster Report ID ", which_clust, "_Updated.html"),
                   authenticate = TRUE,
                   send = TRUE) 
@@ -497,26 +498,25 @@ if (max(session$col$RECURR_INT) < 100) {             ####REDUCE NUMBER IF TESTIN
   
 } #is cluster significant if/else closure
 
-
 } #run_satscan function closure
 
 
-walk(parameters$Disease,run_satscan)  
+walk(parameters$Disease, run_satscan)  
 
 # run_satscan("Campylobacteriosis")
 # run_satscan("Cryptosporidiosis")
 # run_satscan("Cyclosporiasis") 
-# run_satscan("Giardiasis")    
-# run_satscan("Hepatitis A") 
-# run_satscan("Legionellosis")
+# #run_satscan("Giardiasis")    
+# #run_satscan("Hepatitis A") 
+# # run_satscan("Legionellosis")
 # run_satscan("Mumps") 
-# run_satscan("Pertussis") 
-# run_satscan("Salmonellosis") 
+# # run_satscan("Pertussis") 
+# # run_satscan("Salmonellosis") 
 # run_satscan("STEC O157:H7")
-# run_satscan("STEC Not Cultured")
-# run_satscan("STEC Non-O157") 
-# run_satscan("Shigellosis") 
-# run_satscan("Group A Strep") 
+# # run_satscan("STEC Not Cultured")
+# # run_satscan("STEC Non-O157") 
+# # run_satscan("Shigellosis") 
+# # run_satscan("Group A Strep") 
 # run_satscan("Varicella")
 
 
@@ -527,26 +527,26 @@ walk(parameters$Disease,run_satscan)
 #Notify programmer via email of the scan results
 if(as.Date(file.mtime("Cluster History File.csv")) == Sys.Date()){
   
-  send.mail(from = key_get("satscan_sender"),
-            to = key_get("email"),
+  send.mail(from = "noreply@cookcountyhealth.org",
+            to = key_get("rk_email"),
             subject = "Daily SatScan Report - Exact Locations",
             body = paste("Results of the run for", Sys.Date(), "are attached."),   
-            smtp = list(host.name = key_get("email_host"), #port = 25,
-                        user.name = key_get("email"),
-                        passwd = key_get("email_pw"), tls = TRUE),
+            smtp = list(host.name = key_get("cchhs_host"), #port = **,
+                        user.name = key_get("rk_email"),
+                        passwd = key_get("office365"), tls = TRUE),
             attach.files = c("satscan_function_log.txt", "try_error_log.txt"),
             authenticate = TRUE,
             send = TRUE) 
   
 } else{ 
   
-  send.mail(from = key_get("satscan_sender"),
-            to = key_get("email"),
+  send.mail(from = "noreply@cookcountyhealth.org",
+            to = key_get("rk_email"),
             subject = "ATTENTION: Daily SatScan Cluster Detection Failed - Exact Locations",
             body = "Please check the script and troubleshoot.",
-            smtp = list(host.name = key_get("email_host"), #port = 25,
-                        user.name = key_get("email"),
-                        passwd = key_get("email_pw"), tls = TRUE),
+            smtp = list(host.name = key_get("cchhs_host"), #port = **,
+                        user.name = key_get("rk_email"),
+                        passwd = key_get("office365"), tls = TRUE),
             authenticate = TRUE,
             send = TRUE)
   
