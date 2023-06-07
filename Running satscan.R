@@ -49,7 +49,7 @@ Sys.setenv(RSTUDIO_PANDOC="C:/Program Files/RStudio/bin/pandoc")
 #          `Event Date` = mdy(str_remove(`Event Date`, ' 0:00')))
 
 #Importing Business Objects Report
-events <- read_csv("C:/Users/rishi.kowalski/Data/satscan-data/SatScanData052223.csv", col_types = "ccccccccciccccccddccdcccc") %>%
+events <- read_csv("C:/Users/rishi.kowalski/Data/satscan-data/SatScanData060623.csv", col_types = "ccccccccciccccccddccdcccc") %>%
               mutate(
                 `Onset Date` = ymd(str_remove(`Onset Date`, '[[:space:]].*')),
                 `Event Date` = ymd(str_remove(`Event Date`, '[[:space:]].*')))
@@ -193,7 +193,6 @@ ss.options(list(StudyPeriodCheckType=1, #relax geography bounds per cop
 
 #Write files
 td <- tempdir()
-print(list.files(td))
 write.ss.prm(td, "SessionR")
 write.cas(as.data.frame(casfile), td, "SessionR")
 write.geo(as.data.frame(geofile), td, "SessionR")
