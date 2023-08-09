@@ -49,10 +49,12 @@ Sys.setenv(RSTUDIO_PANDOC="C:/Program Files/RStudio/bin/pandoc")
 #          `Event Date` = mdy(str_remove(`Event Date`, ' 0:00')))
 
 #Importing Business Objects Report
-events <- read_csv("C:/Users/rishi.kowalski/Data/satscan-data/SatScanData060623.csv", col_types = "ccccccccciccccccddccdcccc") %>%
+events <- read_csv("C:/Users/rishi.kowalski/Data/satscan-data/SatScanData080723.csv", col_types = "ccccccccciccccccddccdcccc") %>%
               mutate(
-                `Onset Date` = ymd(str_remove(`Onset Date`, '[[:space:]].*')),
-                `Event Date` = ymd(str_remove(`Event Date`, '[[:space:]].*')))
+                #`Onset Date` = ymd(str_remove(`Onset Date`, '[[:space:]].*')),
+                #`Event Date` = ymd(str_remove(`Event Date`, '[[:space:]].*')))
+                `Onset Date` = mdy(`Onset Date`),
+                `Event Date` = mdy(`Event Date`)) #modify as BO changed date format 8/4/23
 
 
 #Replacing spaces in column names
@@ -196,6 +198,8 @@ td <- tempdir()
 write.ss.prm(td, "SessionR")
 write.cas(as.data.frame(casfile), td, "SessionR")
 write.geo(as.data.frame(geofile), td, "SessionR")
+
+print("prm written")
 
 #Run SatScan and store results
 session <- try(satscan(td, "SessionR", sslocation = "C:/SaTScan", cleanup = FALSE, verbose = TRUE), silent = T)
@@ -503,19 +507,19 @@ if (max(session$col$RECURR_INT) < 100) {             ####REDUCE NUMBER IF TESTIN
 walk(parameters$Disease, run_satscan)  
 
 # run_satscan("Campylobacteriosis")
-# run_satscan("Cryptosporidiosis")
+run_satscan("Cryptosporidiosis")
 # run_satscan("Cyclosporiasis") 
-# #run_satscan("Giardiasis")    
-# #run_satscan("Hepatitis A") 
-# # run_satscan("Legionellosis")
+# run_satscan("Giardiasis")    
+# run_satscan("Hepatitis A") 
+# run_satscan("Legionellosis")
 # run_satscan("Mumps") 
-# # run_satscan("Pertussis") 
-# # run_satscan("Salmonellosis") 
+# run_satscan("Pertussis") 
+# run_satscan("Salmonellosis") 
 # run_satscan("STEC O157:H7")
-# # run_satscan("STEC Not Cultured")
-# # run_satscan("STEC Non-O157") 
-# # run_satscan("Shigellosis") 
-# # run_satscan("Group A Strep") 
+# run_satscan("STEC Not Cultured")
+# run_satscan("STEC Non-O157") 
+# run_satscan("Shigellosis") 
+# run_satscan("Group A Strep") 
 # run_satscan("Varicella")
 
 
